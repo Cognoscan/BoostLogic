@@ -120,8 +120,9 @@ architecture rtl of reset_sequencer is
   --! Unsigned type value of db_count_val
   constant db_counter_init : unsigned((db_counter_width - 1) downto 0) :=
     to_unsigned(db_count_val, db_counter_width);
-  --! Debounce Counter register
-  signal debounce_counter : unsigned((db_counter_width - 1) downto 0);
+  --! Debounce Counter register. Initialize to zero for simulation.
+  signal debounce_counter : unsigned((db_counter_width - 1) downto 0) :=
+    (others => '0');
 
   -- Timer constants and signals
   --! Values timer counter will count down from during sequencing
@@ -182,15 +183,23 @@ begin
         timer <= timer_inits(0);
         reset_stage <= (others => '0');
         retry <= '0';
+        done <= '0';
       else
+        done <= '0';
         timer <= timer - 1; -- Decrement unless overriden.
         if retry <= '0' then
           -- Go to next as soon as signal is good
           if move_fast(to_integer(reset_stage)) = '1' then
             -- System is good
             if check_good(to_integer(reset_stage)) = '1' then
-              reset_stage <= reset_stage + 1;
-              timer <= timer_inits(to_integer(reset_stage) + 1);
+              -- Check to see if done with sequence
+              if to_integer(reset_stage) = (rst_vector'length - 1) then
+                done <= '1';
+                timer <= (others => '0');
+              else
+                reset_stage <= reset_stage + 1;
+                timer <= timer_inits(to_integer(reset_stage) + 1);
+              end if;
             else
               -- Expired before it went good
               if timer = to_unsigned(0, timer_width) then
@@ -204,8 +213,14 @@ begin
             if timer = to_unsigned(0, timer_width) then
               -- Next in sequence if check_good is good
               if check_good(to_integer(reset_stage)) = '1' then
-                reset_stage <= reset_stage + 1;
-                timer <= timer_inits(to_integer(reset_stage) + 1);
+                -- Check to see if doen with sequence
+                if to_integer(reset_stage) = (rst_vector'length - 1) then
+                  done <= '1';
+                  timer <= (others => '0');
+                else
+                  reset_stage <= reset_stage + 1;
+                  timer <= timer_inits(to_integer(reset_stage) + 1);
+                end if;
               -- Retry if check_good is bad
               else
                 reset_stage <= reset_stage - 1;

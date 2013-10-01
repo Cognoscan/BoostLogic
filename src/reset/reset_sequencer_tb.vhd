@@ -43,7 +43,7 @@ architecture sim of reset_sequencer_tb is
 
 begin
 
-  uut : boostlogic.reset_sequencer
+  uut : entity boostlogic.reset_sequencer
   generic map (
                 clk_period => clk_period,
                 wait_times => (10 ns, 20 ns, 30 ns, 40 ns, 50 ns),
@@ -61,17 +61,17 @@ begin
 
   clk_proc : process
   begin
-    clk = '0';
+    clk <= '0';
     wait for clk_period / 2;
-    clk = '1';
+    clk <= '1';
     wait for clk_period / 2;
   end process;
 
   rst_proc : process
   begin
-    rst = '1';
+    rst <= '1';
     wait for clk_period * 4;
-    rst = '0';
+    rst <= '0';
     wait;
   end process;
 
