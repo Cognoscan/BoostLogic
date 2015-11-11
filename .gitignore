@@ -1,6 +1,12 @@
 # Text editor files to ignore #
 
+# Editor files
 *.swp
 
 
+# Modelsim stuff
+boostlogic/
+boostlogic_tb/
 modelsim/
+verilog/work/
+vsim.wlf
