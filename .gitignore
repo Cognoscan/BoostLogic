@@ -5,6 +5,8 @@
 
 
 # Modelsim stuff
+transcript
+modelsim.ini
 boostlogic/
 boostlogic_tb/
 modelsim/

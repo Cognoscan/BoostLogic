@@ -20,7 +20,7 @@ module Tx8b10b #(
 wire [7:0] dataToEncode;
 
 reg [3:0] outCounter;
-reg [1:10] shiftOut;
+reg [1:9] shiftOut;
 reg readStrobe;
 reg runDisparity6b; // 1=RD is +1, 0=RD is -1
 reg runDisparity4b; // 1=RD is +1, 0=RD is -1
@@ -85,7 +85,7 @@ always @(posedge clk) begin
         if (outCounter == 'd0) begin
             readStrobe <= 1'b0;
             outCounter <= 'd9;
-            shiftOut[7:10] <= {shiftOut[8:10], 1'b0};
+            shiftOut[7:9] <= {shiftOut[8:9], 1'b0};
             // 5b/6b Encoder
             useAlt <= 1'b0;
             dataPresentLatch <= dataPresent;
@@ -170,34 +170,34 @@ always @(posedge clk) begin
             if (dataPresentLatch) begin
                 readStrobe <= 1'b1;
                 case ({dataToEncode[7:5], runDisparity4b})
-                    4'b0000 : begin shiftOut[7:10] <= 4'b1011; runDisparity6b <= 1'b1; end
-                    4'b0001 : begin shiftOut[7:10] <= 4'b0100; runDisparity6b <= 1'b0; end
-                    4'b0010 : begin shiftOut[7:10] <= 4'b1001; runDisparity6b <= 1'b0; end
-                    4'b0011 : begin shiftOut[7:10] <= 4'b1001; runDisparity6b <= 1'b1; end
-                    4'b0100 : begin shiftOut[7:10] <= 4'b0101; runDisparity6b <= 1'b0; end
-                    4'b0101 : begin shiftOut[7:10] <= 4'b0101; runDisparity6b <= 1'b1; end
-                    4'b0110 : begin shiftOut[7:10] <= 4'b1100; runDisparity6b <= 1'b0; end
-                    4'b0111 : begin shiftOut[7:10] <= 4'b0011; runDisparity6b <= 1'b1; end
-                    4'b1000 : begin shiftOut[7:10] <= 4'b1101; runDisparity6b <= 1'b1; end
-                    4'b1001 : begin shiftOut[7:10] <= 4'b0010; runDisparity6b <= 1'b0; end
-                    4'b1010 : begin shiftOut[7:10] <= 4'b1010; runDisparity6b <= 1'b0; end
-                    4'b1011 : begin shiftOut[7:10] <= 4'b1010; runDisparity6b <= 1'b1; end
-                    4'b1100 : begin shiftOut[7:10] <= 4'b0110; runDisparity6b <= 1'b0; end
-                    4'b1101 : begin shiftOut[7:10] <= 4'b0110; runDisparity6b <= 1'b1; end
-                    4'b1110 : begin shiftOut[7:10] <= (useAlt) ? 4'b0111 : 4'b1110; runDisparity6b <= 1'b1; end
-                    4'b1111 : begin shiftOut[7:10] <= (useAlt) ? 4'b1000 : 4'b0001; runDisparity6b <= 1'b0; end
+                    4'b0000 : begin shiftOut[6:9] <= 4'b1011; runDisparity6b <= 1'b1; end
+                    4'b0001 : begin shiftOut[6:9] <= 4'b0100; runDisparity6b <= 1'b0; end
+                    4'b0010 : begin shiftOut[6:9] <= 4'b1001; runDisparity6b <= 1'b0; end
+                    4'b0011 : begin shiftOut[6:9] <= 4'b1001; runDisparity6b <= 1'b1; end
+                    4'b0100 : begin shiftOut[6:9] <= 4'b0101; runDisparity6b <= 1'b0; end
+                    4'b0101 : begin shiftOut[6:9] <= 4'b0101; runDisparity6b <= 1'b1; end
+                    4'b0110 : begin shiftOut[6:9] <= 4'b1100; runDisparity6b <= 1'b0; end
+                    4'b0111 : begin shiftOut[6:9] <= 4'b0011; runDisparity6b <= 1'b1; end
+                    4'b1000 : begin shiftOut[6:9] <= 4'b1101; runDisparity6b <= 1'b1; end
+                    4'b1001 : begin shiftOut[6:9] <= 4'b0010; runDisparity6b <= 1'b0; end
+                    4'b1010 : begin shiftOut[6:9] <= 4'b1010; runDisparity6b <= 1'b0; end
+                    4'b1011 : begin shiftOut[6:9] <= 4'b1010; runDisparity6b <= 1'b1; end
+                    4'b1100 : begin shiftOut[6:9] <= 4'b0110; runDisparity6b <= 1'b0; end
+                    4'b1101 : begin shiftOut[6:9] <= 4'b0110; runDisparity6b <= 1'b1; end
+                    4'b1110 : begin shiftOut[6:9] <= (useAlt) ? 4'b0111 : 4'b1110; runDisparity6b <= 1'b1; end
+                    4'b1111 : begin shiftOut[6:9] <= (useAlt) ? 4'b1000 : 4'b0001; runDisparity6b <= 1'b0; end
                 endcase
             end
             else begin
                 readStrobe <= 1'b0;
-                shiftOut[7:10] <= (runDisparity4b) ? FILL_WORD_RD1[3:0] : FILL_WORD_RD0[3:0];
+                shiftOut[6:9] <= (runDisparity4b) ? FILL_WORD_RD1[3:0] : FILL_WORD_RD0[3:0];
                 runDisparity4b <= FILL_WORD_FLIP ^ runDisparity6b;
             end
         end
         else begin
             readStrobe <= 1'b0;
             outCounter <= outCounter - 2'd1;
-            shiftOut <= {shiftOut[2:10], 1'b0};
+            shiftOut <= {shiftOut[2:9], 1'b0};
         end
     end
     else begin
