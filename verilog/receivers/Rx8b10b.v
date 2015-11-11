@@ -2,11 +2,11 @@
 
 
 module Rx8b10b #(
-    parameter FILL_WORD_RD0 = 10'b0011111010, // Send when no data present & RD=-1
-    parameter FILL_WORD_RD1 = 10'b1100000101, // Send when no data present & RD=1
-    parameter FILL_WORD_FLIP = 1'b1,          // Flip status of Running Disparity when using fill word
-    parameter CLK_RATE = 8, ///< Number of clocks per data bit
-    parameter LOG2_DEPTH = 4                  // log2(depth of FIFO buffer). Must be an integer.
+    parameter FILL_WORD_RD0 = 10'b0011111010, ///< Send when no data present & RD=-1
+    parameter FILL_WORD_RD1 = 10'b1100000101, ///< Send when no data present & RD=1
+    parameter FILL_WORD_FLIP = 1'b1,          ///< Flip status of Running Disparity when using fill word
+    parameter CLK_RATE = 8,                   ///< Number of clocks per data bit
+    parameter LOG2_DEPTH = 4                  ///< log2(depth of FIFO buffer). Must be an integer.
 )
 (
     input clk,           ///< System clock
@@ -20,7 +20,9 @@ module Rx8b10b #(
     output [7:0] dataOut ///< Data received
 );
 
-parameter integer CLK_COUNT_WIDTH = $clog2(CLK_RATE);
+parameter integer CLK_COUNT_WIDTH = $clog2(CLK_RATE-1);
+localparam CLK_COUNT_INIT = CLK_RATE-1;
+localparam CLK_COUNT_CAPTURE = (CLK_RATE>>1);
 
 reg [CLK_COUNT_WIDTH-1:0] rxClkCount;
 reg [7:0] decodedData;
@@ -71,9 +73,9 @@ end
 // Bit alignment
 always @(posedge clk) begin
     rxD1 <= rx;
-    rxClk <= rxClkCount == (CLK_RATE >> 1);
+    rxClk <= rxClkCount == CLK_COUNT_CAPTURE;
     if ((rx ^ rxD1) || (rxClkCount == 'd0)) begin
-        rxClkCount <= CLK_RATE;
+        rxClkCount <= CLK_COUNT_INIT;
     end
     else begin
         rxClkCount <= rxClkCount - 2'd1;
@@ -84,7 +86,7 @@ end
 always @(posedge clk) begin
     // Input shift register
     if (rxClk) begin
-        shiftData <= {shiftData[2:10], rx};
+        shiftData <= {shiftData[2:10], rxD1};
     end
     // Bit counter
     if (rxEnable && ~locked 
@@ -98,9 +100,14 @@ always @(posedge clk) begin
         inCounter <= inCounter + 2'd1;
         shiftDone <= 1'b0;
     end
-    else if (inCounter == 'd10) begin
+    else if ((inCounter == 'd10)
+        && !((shiftData == FILL_WORD_RD1) || (shiftData == FILL_WORD_RD0)))
+    begin
         inCounter <= 'd0;
         shiftDone <= 1'b1;
+    end
+    else if (inCounter == 'd10) begin
+        inCounter <= 'd0;
     end
     else if (~rxEnable) begin
         inCounter <= 'd0;
@@ -119,6 +126,7 @@ always @(posedge clk) begin
         error5b6b <= 1'b0;
         error3b4b <= 1'b0;
         decodedData <= 'd0;
+        writeStrobe <= 1'b0;
     end
     else begin
         if (shiftDone) begin
