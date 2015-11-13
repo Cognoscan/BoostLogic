@@ -15,6 +15,7 @@ reg readStrobe;   // Read data from receive FIFO
 reg rxEnable;       // Set to start/enable receiver
 
 wire [7:0] dataOut; // Data received
+wire errorDetect;   // Error detected. Does not latch.
 wire rxDataPresent; // FIFO has data still in it
 wire rxHalfFull;    // FIFO halfway full
 wire rxFull;        // FIFO is completely full. Don't write to it.
@@ -114,6 +115,7 @@ uut (
     .dataPresent(rxDataPresent), ///< FIFO has data still in it
     .halfFull(rxHalfFull),       ///< FIFO halfway full
     .full(rxFull),               ///< FIFO is completely full. Don't write to it.
+    .errorDetect(errorDetect),   ///< Error detected. Does not latch.
     .dataOut(dataOut)            ///< [7:0] Data received
 );
 

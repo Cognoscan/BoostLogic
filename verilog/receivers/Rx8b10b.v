@@ -1,4 +1,32 @@
+/**
+# Rx8b10b Receiver/Decoder #
+Takes in an unaligned serial bit stream, aligns to comma symbols in the data, 
+and decodes the 8b10b encoded data.
 
+## Bit Alignment ##
+Bit alignment here is extremely naive: it aligns to the latest detected bit edge 
+in the bitstream.
+
+## Word Alignment ##
+Word alignment is done by aligning to either of the "fill words" selected by the 
+parameter section. Compared to the bit alignment section, it looks two bit 
+periods earlier in the bitstream. This allows it to align to a comma value where 
+the first transition is two bit periods in.
+
+## Decoding ##
+Decoding is relatively simple: use look-up tables of known 6b/5b codes and 4b/3b 
+codes to get the 8 bit word. If the code word doesn't show up, then we know we 
+have an error. 
+
+## Possible Future Improvements ##
+Bit alignment has very little noise immunity. It can be improved by decreasing 
+response to edges after an initial lock, and by using an integrate & dump filter 
+for the bit to be shifted into the byte alignment section.
+
+Better error detection could be achieved by tracking running disparity, then 
+determining if the code word is valid given that disparity state.
+
+*/
 
 
 module Rx8b10b #(
@@ -17,13 +45,18 @@ module Rx8b10b #(
     output dataPresent,  ///< FIFO has data still in it
     output halfFull,     ///< FIFO halfway full
     output full,         ///< FIFO is completely full. Don't write to it.
+    output errorDetect,  ///< Error detected. Does not latch.
     output [7:0] dataOut ///< Data received
 );
 
 parameter integer CLK_COUNT_WIDTH = $clog2(CLK_RATE-1);
 localparam CLK_COUNT_INIT = CLK_RATE-1;
 localparam CLK_COUNT_CAPTURE = (CLK_RATE>>1);
+localparam RX_DELAY_LEN = CLK_RATE*2;
 
+wire rxClk;
+
+reg [RX_DELAY_LEN-1:0] rxDelay;
 reg [CLK_COUNT_WIDTH-1:0] rxClkCount;
 reg [7:0] decodedData;
 reg [1:10] shiftData;
@@ -32,7 +65,6 @@ reg shiftDone;
 reg locked;
 reg writeStrobe;
 reg rxD1;
-reg rxClk;
 reg error5b6b;
 reg error3b4b;
 
@@ -61,8 +93,8 @@ else begin
 end
 
 initial begin
+    rxDelay    = 'd0;
     rxD1       = 1'b0;
-    rxClk      = 1'b0;
     rxClkCount = 'd0;
     shiftData  = 'd0;
     inCounter  = 'd0;
@@ -71,9 +103,9 @@ initial begin
 end
 
 // Bit alignment
+assign rxClk = (rxClkCount == CLK_COUNT_CAPTURE);
 always @(posedge clk) begin
     rxD1 <= rx;
-    rxClk <= rxClkCount == CLK_COUNT_CAPTURE;
     if ((rx ^ rxD1) || (rxClkCount == 'd0)) begin
         rxClkCount <= CLK_COUNT_INIT;
     end
@@ -84,9 +116,11 @@ end
 
 // Word alignment
 always @(posedge clk) begin
+    // Delay serial data to look for "comma value"  earlier in bitstream
+    rxDelay <= (rxDelay << 1) | rx;
     // Input shift register
     if (rxClk) begin
-        shiftData <= {shiftData[2:10], rxD1};
+        shiftData <= {shiftData[2:10], rxDelay[RX_DELAY_LEN-1]};
     end
     // Bit counter
     if (rxEnable && ~locked 
@@ -121,6 +155,7 @@ always @(posedge clk) begin
 end
 
 // Word Decoder
+assign errorDetect = error5b6b | error3b4b;
 always @(posedge clk) begin
     if (rst) begin
         error5b6b <= 1'b0;
@@ -131,6 +166,8 @@ always @(posedge clk) begin
     else begin
         if (shiftDone) begin
             writeStrobe <= 1'b1;
+            error5b6b <= 1'b0;
+            error3b4b <= 1'b0;
             case (shiftData[1:6])
                 6'b100111 : decodedData[4:0] <= 5'b00000;
                 6'b011000 : decodedData[4:0] <= 5'b00000;
@@ -139,56 +176,38 @@ always @(posedge clk) begin
                 6'b101101 : decodedData[4:0] <= 5'b00010;
                 6'b010010 : decodedData[4:0] <= 5'b00010;
                 6'b110001 : decodedData[4:0] <= 5'b00011;
-                6'b110001 : decodedData[4:0] <= 5'b00011;
                 6'b110101 : decodedData[4:0] <= 5'b00100;
                 6'b001010 : decodedData[4:0] <= 5'b00100;
                 6'b101001 : decodedData[4:0] <= 5'b00101;
-                6'b101001 : decodedData[4:0] <= 5'b00101;
-                6'b011001 : decodedData[4:0] <= 5'b00110;
                 6'b011001 : decodedData[4:0] <= 5'b00110;
                 6'b111000 : decodedData[4:0] <= 5'b00111;
                 6'b000111 : decodedData[4:0] <= 5'b00111;
                 6'b111001 : decodedData[4:0] <= 5'b01000;
                 6'b000110 : decodedData[4:0] <= 5'b01000;
                 6'b100101 : decodedData[4:0] <= 5'b01001;
-                6'b100101 : decodedData[4:0] <= 5'b01001;
-                6'b010101 : decodedData[4:0] <= 5'b01010;
                 6'b010101 : decodedData[4:0] <= 5'b01010;
                 6'b110100 : decodedData[4:0] <= 5'b01011;
-                6'b110100 : decodedData[4:0] <= 5'b01011;
-                6'b001101 : decodedData[4:0] <= 5'b01100;
                 6'b001101 : decodedData[4:0] <= 5'b01100;
                 6'b101100 : decodedData[4:0] <= 5'b01101;
-                6'b101100 : decodedData[4:0] <= 5'b01101;
-                6'b011100 : decodedData[4:0] <= 5'b01110;
                 6'b011100 : decodedData[4:0] <= 5'b01110;
                 6'b010111 : decodedData[4:0] <= 5'b01111;
                 6'b101000 : decodedData[4:0] <= 5'b01111;
                 6'b011011 : decodedData[4:0] <= 5'b10000;
                 6'b100100 : decodedData[4:0] <= 5'b10000;
                 6'b100011 : decodedData[4:0] <= 5'b10001;
-                6'b100011 : decodedData[4:0] <= 5'b10001;
-                6'b010011 : decodedData[4:0] <= 5'b10010;
                 6'b010011 : decodedData[4:0] <= 5'b10010;
                 6'b110010 : decodedData[4:0] <= 5'b10011;
-                6'b110010 : decodedData[4:0] <= 5'b10011;
-                6'b001011 : decodedData[4:0] <= 5'b10100;
                 6'b001011 : decodedData[4:0] <= 5'b10100;
                 6'b101010 : decodedData[4:0] <= 5'b10101;
-                6'b101010 : decodedData[4:0] <= 5'b10101;
-                6'b011010 : decodedData[4:0] <= 5'b10110;
                 6'b011010 : decodedData[4:0] <= 5'b10110;
                 6'b111010 : decodedData[4:0] <= 5'b10111;
                 6'b000101 : decodedData[4:0] <= 5'b10111;
                 6'b110011 : decodedData[4:0] <= 5'b11000;
                 6'b001100 : decodedData[4:0] <= 5'b11000;
                 6'b100110 : decodedData[4:0] <= 5'b11001;
-                6'b100110 : decodedData[4:0] <= 5'b11001;
-                6'b010110 : decodedData[4:0] <= 5'b11010;
                 6'b010110 : decodedData[4:0] <= 5'b11010;
                 6'b110110 : decodedData[4:0] <= 5'b11011;
                 6'b001001 : decodedData[4:0] <= 5'b11011;
-                6'b001110 : decodedData[4:0] <= 5'b11100;
                 6'b001110 : decodedData[4:0] <= 5'b11100;
                 6'b101110 : decodedData[4:0] <= 5'b11101;
                 6'b010001 : decodedData[4:0] <= 5'b11101;
@@ -213,7 +232,7 @@ always @(posedge clk) begin
                 4'b1110 : decodedData[7:5] <= 3'b111;
                 4'b1000 : decodedData[7:5] <= 3'b111;
                 4'b0001 : decodedData[7:5] <= 3'b111;
-                default : begin decodedData[7:5] <= 3'b000; error5b6b <= 1'b1; end
+                default : begin decodedData[7:5] <= 3'b000; error3b4b <= 1'b1; end
             endcase
         end
         else begin
