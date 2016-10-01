@@ -1,14 +1,27 @@
-# Text editor files to ignore #
+#Ignores for VHDL
 
-# Editor files
+# Ignores for Verilog
+verilog/work/
+verilog/xsim.dir/
+verilog/build/
+verilog/xvlog.log
+verilog/xvlog.pb
+
+# Ignore Vim Swapfiles
 *.swp
 
-
-# Modelsim stuff
-transcript
-modelsim.ini
+# Ignore complied directories
 boostlogic/
 boostlogic_tb/
-modelsim/
-verilog/work/
+
+# Ignore Doxygen output
+doc/html/
+doc/latex/
+
+# Ignore Modelsim files
 vsim.wlf
+modelsim.ini
+transcript
+vsim_stacktrace.vstf
+wave.do
+
