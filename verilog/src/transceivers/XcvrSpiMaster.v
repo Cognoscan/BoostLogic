@@ -45,7 +45,7 @@ module XcvrSpiMaster #(
 
 wire [7:0] txData;
 wire [7:0] rxData;
-wire capture;
+wire sckInternal;
 
 reg [7:0] dataInReg;
 reg [7:0] dataOutReg;
@@ -56,7 +56,6 @@ reg dataOutReady;
 reg misoCapture;
 reg rxWrite;
 reg txRead;
-reg sckInternal;
 
 ///////////////////////////////////////////////////////////////////////////
 // MAIN CODE
@@ -80,6 +79,10 @@ if (LOG2_DEPTH > 0) begin
         .halfFull(txHalfFull),       ///< FIFO is half full
         .full(txFull)                ///< FIFO is full
     );
+    initial begin // Set unused signals to zero.
+        dataInReg = 8'd0;
+        busy = 1'b0;
+    end
 end
 else begin
     // Create a simple busy bit and register the data to be sent
@@ -113,6 +116,10 @@ if (LOG2_DEPTH > 0) begin
         .halfFull(rxHalfFull),       ///< FIFO is half full
         .full(rxFull)                ///< FIFO is full
     );
+    initial begin // Set unused signals to zero.
+        dataInReg = 8'd0;
+        dataOutReady = 1'b0;
+    end
 end
 else begin
     // Create a simple rxReady bit and register received data
@@ -128,7 +135,7 @@ else begin
     end
 end
 
-assign sck = (~nCs & sckInternal) ^ cpol; // Invert clock polarity if necessary
+assign sck = (~nCs & ~state[4] & state[0]) ^ cpol; // Invert clock polarity if necessary
 assign mosi = shiftReg[7]; // Master out is MSB of shift register
 
 initial begin
@@ -136,7 +143,6 @@ initial begin
         dataOutReady = 1'b0;
         dataOutReg   = 'd0;
         nCs          = 1'b1;
-        sckInternal  = 1'b0;
         state        = 'd0;
         shiftReg     = 'd0;
         txRead       = 1'b0;
@@ -144,13 +150,17 @@ initial begin
         misoCapture  = 1'b0;
 end
 
+// State Machine:
+// The state machine acts as a 16-state counter during a transaction. The LSB is 
+// used as the clock, and the 5th bit is used to set nCs. Phase of the LSB is 
+// used to determine when to capture MISO and when to clock out MOSI.
+
 assign rxData = {shiftReg[6:0], misoCapture};
-assign capture = sckInternal ^ cpha;
+assign sckInternal = ~state[4] & (state[0] ^ cpha);
 always @(posedge clk) begin
     if (rst) begin
         nCs         <= 1'b1;
-        sckInternal <= 1'b0;
-        state       <= 5'd16;
+        state       <= 5'd17;
         shiftReg    <= 'd0;
         txRead      <= 1'b0;
         rxWrite     <= 1'b0;
@@ -173,13 +183,11 @@ always @(posedge clk) begin
             if (state == 5'd17 && txDataPresent) begin
                 state <= 'd0;
             end
-            else begin
+            else if (state != 5'd17) begin
                 state <= state + 2'd1;
             end
             // Chip Select
             nCs <= state[4];
-            // SCLK
-            sckInternal <= state[0] & ~state[4];
             // MOSI/MISO Shift register
             if (~state[4] & state[0]) begin
                 shiftReg <= {shiftReg[6:0], misoCapture};

@@ -18,8 +18,8 @@ INCDIR   = ./include
 #DO NOT EDIT BELOW THIS LINE
 #---------------------------------------------------------------------------------
 
-VSRCS=$(shell find $(SRCDIR) -type f -name "*.v")
-SVSRCS=$(shell find $(SRCDIR) -type f -name "*.sv")
+VSRCS=$(shell find -L $(SRCDIR) -type f -name "*.v")
+SVSRCS=$(shell find -L $(SRCDIR) -type f -name "*.sv")
 VOBJS=$(patsubst $(SRCDIR)/%, $(BUILDDIR)/%, $(VSRCS:.v=.ov))
 SVOBJS=$(patsubst $(SRCDIR)/%, $(BUILDDIR)/%, $(SVSRCS:.sv=.osv))
 

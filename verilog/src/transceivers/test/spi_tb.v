@@ -1,5 +1,9 @@
 module spi_tb ();
 
+// UUT Parameters
+parameter LOG2_DEPTH = 4;
+
+// UUT Signals
 wire nCs;
 wire mosi;
 wire miso;
@@ -18,7 +22,6 @@ wire txFullS;
 wire rxDataPresentS;
 wire rxHalfFullS;   
 wire rxFullS;       
-
 reg clk;
 reg rst;
 reg spiStrobe;
@@ -31,8 +34,27 @@ reg cpha;
 reg [7:0] dinMaster;
 reg [7:0] dinSlave;
 
-parameter LOG2_DEPTH = 4;
+// Test Signals
+reg [7:0] dataM;
+reg [7:0] dataS;
+reg [7:0] prevDataM;
+reg [7:0] prevDataS;
 
+integer i,j;
+
+///////////////////////////////////////////////////////////////////////////
+// System Setup
+///////////////////////////////////////////////////////////////////////////
+
+initial begin
+    clk         = 1'b0;
+    rst         = 1'b1;
+    spiStrobe   = 1'b0;
+    cpol        = 1'b0;
+    cpha        = 1'b0;
+end
+
+// Clocks & Strobes
 always #1 clk = ~clk;
 always begin
     @(posedge clk) spiStrobe <= 1'b1;
@@ -45,17 +67,21 @@ always begin
     @(posedge clk) spiStrobe <= 1'b0;
 end
 
-integer i,j;
+initial begin
+    wait((j < 0) && (i == 256));
+    $stop();
+end
+
+///////////////////////////////////////////////////////////////////////////
+// Master Control
+///////////////////////////////////////////////////////////////////////////
 
 initial begin
-    clk         = 1'b0;
-    rst         = 1'b1;
-    spiStrobe   = 1'b0;
+    dataM = 0;
+    prevDataM = 0;
     dinMaster   = 'd0;
     writeMaster = 1'b0;
     readMaster  = 1'b0;
-    cpol        = 1'b0;
-    cpha        = 1'b0;
     #7 rst = 1'b0;
 
     for (i=0; i<256; i=i+1) begin
@@ -68,7 +94,27 @@ initial begin
     end
 end
 
+always begin
+    prevDataM = dataM;
+    wait(rxDataPresentM);
+    dataM = doutMaster;
+    prevDataM = prevDataM - 8'd1;
+    if (prevDataM != dataM) begin
+        $display("Master data was $x instead of %x", dataM, prevDataM);
+        $stop();
+    end
+    @(posedge clk) readMaster = 1'b1;
+    @(posedge clk) readMaster = 1'b0;
+    wait(~rxDataPresentM);
+end
+
+///////////////////////////////////////////////////////////////////////////
+// Slave Control
+///////////////////////////////////////////////////////////////////////////
+
 initial begin
+    prevDataS = 0;
+    dataS = 0;
     dinSlave   = 255;
     writeSlave = 1'b0;
     readSlave  = 1'b0;
@@ -85,18 +131,22 @@ initial begin
 end
 
 always begin
-    wait(rxDataPresentM);
-    @(posedge clk) readMaster = 1'b1;
-    @(posedge clk) readMaster = 1'b0;
-    wait(~rxDataPresentM);
-end
-
-always begin
+    prevDataS = dataS;
     wait(rxDataPresentS);
+    dataS = doutSlave;
+    prevDataS = prevDataS + 8'd1;
+    if (prevDataS != dataS) begin
+        $display("Slave data was $x instead of %x", dataS, prevDataS);
+        $stop();
+    end
     @(posedge clk) readSlave = 1'b1;
     @(posedge clk) readSlave = 1'b0;
     wait(~rxDataPresentS);
 end
+
+///////////////////////////////////////////////////////////////////////////
+// UUT Instantiation
+///////////////////////////////////////////////////////////////////////////
 
 XcvrSpiMaster #(
     .LOG2_DEPTH(LOG2_DEPTH)

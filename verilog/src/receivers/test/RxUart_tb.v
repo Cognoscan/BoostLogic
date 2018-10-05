@@ -14,7 +14,7 @@ wire rxFull;        ///< Receive buffer full
 wire serial;
 wire txDataPresent; ///< Data present in transmit buffer
 wire txHalfFull;    ///< Transmit buffer is half full
-wire txFull         ///< Transmit buffer is full
+wire txFull;        ///< Transmit buffer is full
 
 reg [2:0] baudStrobeCount;
 

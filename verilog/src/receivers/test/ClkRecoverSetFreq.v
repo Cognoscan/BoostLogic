@@ -15,7 +15,8 @@ module ClkRecoverSetFreq #(
 wire intClk;
 
 reg [PHASE_WIDTH-1:0] phase;
-reg freqErr;
+reg [PHASE_WIDTH-1:0] freqErrIn;
+reg [PHASE_WIDTH-1:0] freqErr;
 reg rxD1;
 reg intClkD1;
 
